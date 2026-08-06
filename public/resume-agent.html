@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>简历适配 Agent</title>
+    <style>
+      :root {
+        --bg: #f6f7f8;
+        --panel: #ffffff;
+        --ink: #20262d;
+        --muted: #667085;
+        --line: #d8dee4;
+        --accent: #1f66d1;
+        --accent-dark: #174ea6;
+        --soft-blue: #eef5ff;
+        --soft-green: #edf8f2;
+        --soft-amber: #fff6e8;
+        --shadow: 0 18px 46px rgba(16, 24, 40, 0.08);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        letter-spacing: 0;
+      }
+
+      button, textarea, input, select { font: inherit; }
+
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(255, 255, 255, 0.9);
+        border-bottom: 1px solid var(--line);
+        backdrop-filter: blur(14px);
+      }
+
+      .topbar {
+        max-width: 1380px;
+        margin: 0 auto;
+        padding: 14px 22px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .mark {
+        width: 34px;
+        height: 34px;
+        border-radius: 7px;
+        display: grid;
+        place-items: center;
+        background: #16202b;
+        color: white;
+        font-weight: 800;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.2;
+      }
+
+      .subtitle {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      main {
+        max-width: 1380px;
+        margin: 0 auto;
+        padding: 20px 22px 30px;
+        display: grid;
+        grid-template-columns: minmax(360px, 0.9fr) minmax(430px, 1.15fr);
+        gap: 18px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        min-width: 0;
+      }
+
+      .panel-head {
+        padding: 16px 18px 12px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+
+      h2 { margin: 0; font-size: 15px; }
+      h3 { margin: 0 0 8px; font-size: 13px; }
+
+      .small {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .inputs {
+        padding: 16px 18px 18px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      label {
+        display: grid;
+        gap: 7px;
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      textarea, input, select {
+        width: 100%;
+        border: 1px solid #cbd3db;
+        border-radius: 7px;
+        background: white;
+        color: var(--ink);
+        padding: 10px 11px;
+        outline: none;
+      }
+
+      textarea:focus, input:focus, select:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(31, 102, 209, 0.14);
+      }
+
+      textarea {
+        min-height: 180px;
+        resize: vertical;
+        line-height: 1.55;
+      }
+
+      .upload {
+        border: 1px dashed #aeb9c5;
+        border-radius: 8px;
+        background: #fbfcfd;
+        padding: 16px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .upload input {
+        border: 0;
+        padding: 0;
+        background: transparent;
+      }
+
+      .btn {
+        border: 1px solid var(--line);
+        background: white;
+        color: var(--ink);
+        min-height: 38px;
+        padding: 0 13px;
+        border-radius: 7px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        white-space: nowrap;
+      }
+
+      .btn:hover { border-color: #b2bdc8; }
+
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
+      }
+
+      .btn.primary:hover { background: var(--accent-dark); }
+      .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .mode {
+        display: inline-grid;
+        grid-template-columns: repeat(3, 1fr);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        overflow: hidden;
+        background: white;
+      }
+
+      .mode button {
+        border: 0;
+        border-right: 1px solid var(--line);
+        background: transparent;
+        padding: 8px 10px;
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .mode button:last-child { border-right: 0; }
+
+      .mode button.active {
+        color: var(--accent-dark);
+        background: var(--soft-blue);
+        font-weight: 700;
+      }
+
+      .result {
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        min-height: calc(100vh - 110px);
+      }
+
+      .cards {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 11px;
+        background: #fcfcfb;
+      }
+
+      .card b {
+        display: block;
+        font-size: 20px;
+        line-height: 1;
+      }
+
+      .card span {
+        color: var(--muted);
+        display: block;
+        margin-top: 8px;
+        font-size: 12px;
+      }
+
+      .notice {
+        margin: 14px 18px 0;
+        border: 1px solid #d9c7a7;
+        background: var(--soft-amber);
+        border-radius: 8px;
+        padding: 12px;
+        color: #604000;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .preview {
+        padding: 18px;
+        overflow: auto;
+      }
+
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        line-height: 1.62;
+        font-size: 14px;
+      }
+
+      .empty {
+        min-height: 360px;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        color: var(--muted);
+        padding: 40px;
+      }
+
+      .toast {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        background: #17212b;
+        color: white;
+        border-radius: 7px;
+        padding: 11px 13px;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: 160ms ease;
+        pointer-events: none;
+      }
+
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      @media (max-width: 980px) {
+        main { grid-template-columns: 1fr; }
+        .result { min-height: auto; }
+      }
+
+      @media (max-width: 700px) {
+        .topbar, main { padding-left: 14px; padding-right: 14px; }
+        .topbar { align-items: flex-start; flex-direction: column; }
+        .grid, .cards { grid-template-columns: 1fr; }
+        .toolbar, .btn.primary { width: 100%; }
+        .btn.primary { flex: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="topbar">
+        <div class="brand">
+          <div class="mark">CV</div>
+          <div>
+            <h1>简历适配 Agent</h1>
+            <p class="subtitle">上传 PDF/Word 原简历，按 JD 生成 Word 适配版和综合评价</p>
+          </div>
+        </div>
+        <button class="btn" id="clearBtn" type="button">清空草稿</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel">
+        <div class="panel-head">
+          <h2>输入材料</h2>
+          <span class="small">支持 .docx / .pdf / .txt</span>
+        </div>
+        <div class="inputs">
+          <label class="upload">
+            简历原版文件
+            <input id="resumeFile" type="file" accept=".docx,.pdf,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" />
+            <span class="small" id="fileHint">Word 原件会尽量保留原排版；PDF 会提取文本后生成 Word。</span>
+          </label>
+
+          <div class="grid">
+            <label>
+              公司名称
+              <input id="company" placeholder="例如：OpenAI / 字节跳动 / Stripe" />
+            </label>
+            <label>
+              目标岗位
+              <input id="role" placeholder="例如：产品经理 / AI Engineer / Growth Lead" />
+            </label>
+            <label>
+              公司类型
+              <select id="companyType">
+                <option>AI 原生公司</option>
+                <option>互联网平台</option>
+                <option>ToB SaaS</option>
+                <option>金融科技</option>
+                <option>消费品牌</option>
+                <option>早期创业公司</option>
+                <option>成熟大厂</option>
+              </select>
+            </label>
+            <label>
+              改写力度
+              <select id="intensity">
+                <option value="balanced">均衡：贴合 JD，保留原叙事</option>
+                <option value="conservative">保守：少改措辞，强调匹配</option>
+                <option value="aggressive">进取：强重排，突出岗位关键词</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            JD 岗位描述
+            <textarea id="jd" placeholder="粘贴岗位职责、任职要求、加分项。"></textarea>
+          </label>
+
+          <label>
+            候选人要求
+            <textarea id="requirements" placeholder="例如：突出 AI agent、数据分析和跨团队协作；弱化销售；综合评价要偏稳重、抗压、适应出差。"></textarea>
+          </label>
+
+          <div class="toolbar">
+            <div class="mode" aria-label="简历风格">
+              <button class="active" type="button" data-tone="direct">直接</button>
+              <button type="button" data-tone="executive">高阶</button>
+              <button type="button" data-tone="builder">建设者</button>
+            </div>
+            <button class="btn primary" id="generateBtn" type="button">生成并下载 Word</button>
+            <span class="small" id="status">等待上传</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel result">
+        <div class="panel-head">
+          <h2>生成预览</h2>
+          <span class="small" id="updatedAt">未生成</span>
+        </div>
+        <div class="cards">
+          <div class="card"><b id="formatMetric">-</b><span>输出格式</span></div>
+          <div class="card"><b id="keywordMetric">-</b><span>岗位关键词</span></div>
+          <div class="card"><b id="layoutMetric">-</b><span>版式策略</span></div>
+        </div>
+        <div class="notice">
+          综合评价会放在简历最上方，包含知识结构、技能经验、岗位胜任度、性格兴趣与沟通组织协调、抗压和加班出差适应度等内容。请在投递前人工核验真实性，尤其是性格、抗压、出差等主观表述。
+        </div>
+        <div class="preview" id="preview">
+          <div class="empty">上传原简历并填写 JD 后，点击“生成并下载 Word”。</div>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast">已完成</div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const fields = ["company", "role", "companyType", "intensity", "jd", "requirements"];
+      let currentTone = "direct";
+
+      function saveDraft() {
+        const draft = Object.fromEntries(fields.map((id) => [id, $(id).value]));
+        draft.currentTone = currentTone;
+        localStorage.setItem("resume-agent-upload-draft", JSON.stringify(draft));
+      }
+
+      function loadDraft() {
+        const raw = localStorage.getItem("resume-agent-upload-draft");
+        if (!raw) return;
+        try {
+          const draft = JSON.parse(raw);
+          fields.forEach((id) => {
+            if (draft[id]) $(id).value = draft[id];
+          });
+          if (draft.currentTone) setTone(draft.currentTone);
+        } catch {}
+      }
+
+      function setTone(tone) {
+        currentTone = tone;
+        document.querySelectorAll("[data-tone]").forEach((button) => {
+          button.classList.toggle("active", button.dataset.tone === tone);
+        });
+        saveDraft();
+      }
+
+      function showToast(message) {
+        const toast = $("toast");
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 1900);
+      }
+
+      function setBusy(isBusy) {
+        $("generateBtn").disabled = isBusy;
+        $("generateBtn").textContent = isBusy ? "生成中..." : "生成并下载 Word";
+        $("status").textContent = isBusy ? "正在解析文件并生成 Word" : "可继续生成";
+      }
+
+      function escapeHtml(value) {
+        return value.replace(/[&<>"']/g, (char) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#039;",
+        })[char]);
+      }
+
+      function filenameFromDisposition(disposition) {
+        const match = /filename\*=UTF-8''([^;]+)|filename=([^;]+)/i.exec(disposition || "");
+        if (!match) return "adapted-resume.docx";
+        return decodeURIComponent((match[1] || match[2]).replaceAll('"', ""));
+      }
+
+      async function generate() {
+        const file = $("resumeFile").files[0];
+        if (!file) {
+          showToast("请先上传简历原版");
+          return;
+        }
+        if (!$("jd").value.trim()) {
+          showToast("请粘贴 JD 岗位描述");
+          return;
+        }
+
+        const data = new FormData();
+        data.append("resumeFile", file);
+        fields.forEach((id) => data.append(id, $(id).value));
+        data.append("tone", currentTone);
+
+        setBusy(true);
+        try {
+          const response = await fetch("/api/generate", { method: "POST", body: data });
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+          const blob = await response.blob();
+          const preview = decodeURIComponent(response.headers.get("X-Preview") || "");
+          const keywords = JSON.parse(decodeURIComponent(response.headers.get("X-Keywords") || "[]"));
+          const disposition = response.headers.get("Content-Disposition");
+          const filename = filenameFromDisposition(disposition);
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = filename;
+          link.click();
+          URL.revokeObjectURL(url);
+
+          $("preview").innerHTML = `<pre>${preview || "已生成 Word 文件。"}</pre>`;
+          $("formatMetric").textContent = ".docx";
+          $("keywordMetric").textContent = keywords.length;
+          $("layoutMetric").textContent = file.name.toLowerCase().endsWith(".docx") ? "沿用原件" : "重建 Word";
+          $("updatedAt").textContent = new Date().toLocaleString("zh-CN", { hour12: false });
+          showToast("Word 已生成并开始下载");
+          saveDraft();
+        } catch (error) {
+          showToast(error.message || "生成失败");
+          $("status").textContent = "生成失败，请检查文件格式";
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      $("resumeFile").addEventListener("change", () => {
+        const file = $("resumeFile").files[0];
+        $("fileHint").textContent = file ? `已选择：${file.name}` : "Word 原件会尽量保留原排版；PDF 会提取文本后生成 Word。";
+        $("status").textContent = file ? "已上传简历原版" : "等待上传";
+      });
+      $("generateBtn").addEventListener("click", generate);
+      $("clearBtn").addEventListener("click", () => {
+        fields.forEach((id) => ($(id).value = ""));
+        $("resumeFile").value = "";
+        localStorage.removeItem("resume-agent-upload-draft");
+        $("fileHint").textContent = "Word 原件会尽量保留原排版；PDF 会提取文本后生成 Word。";
+        $("preview").innerHTML = '<div class="empty">上传原简历并填写 JD 后，点击“生成并下载 Word”。</div>';
+        $("formatMetric").textContent = "-";
+        $("keywordMetric").textContent = "-";
+        $("layoutMetric").textContent = "-";
+        $("updatedAt").textContent = "未生成";
+        $("status").textContent = "等待上传";
+      });
+      document.querySelectorAll("[data-tone]").forEach((button) => {
+        button.addEventListener("click", () => setTone(button.dataset.tone));
+      });
+      fields.forEach((id) => $(id).addEventListener("input", saveDraft));
+      loadDraft();
+    </script>
+  </body>
+</html>
