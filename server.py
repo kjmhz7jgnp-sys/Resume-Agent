@@ -116,21 +116,20 @@ def select_lines(resume_text, jd, requirements, intensity):
 def build_evaluation(resume_text, jd, requirements, role, company, company_type, keywords):
     all_text = resume_text + "\n" + jd + "\n" + requirements
     matched = [kw for kw in keywords if kw.lower() in resume_text.lower()]
-    skill_words = "、".join((matched or keywords)[:6]) or "岗位相关技能"
+    skill_words = "、".join((matched or keywords)[:5]) or "岗位相关技能"
     role_name = role or "目标岗位"
     company_name = company or "目标公司"
     has_numbers = bool(re.search(r"[0-9%万亿kK+]", resume_text))
-    quant = "简历中已有一定量化结果，可继续补充业务指标、规模、转化或效率提升数据" if has_numbers else "建议补充可量化成果，例如规模、转化率、成本、周期、收入或效率变化"
-    mobility = "可在面试中进一步确认加班、出差和高强度节奏适应度"
+    quant = "具备一定量化成果意识" if has_numbers else "可继续补充量化成果"
+    mobility = "可适应加班、出差及快节奏工作"
     if re.search(r"出差|加班|抗压|高压|吃苦|驻场|客户现场", all_text):
-        mobility = "材料中已出现高强度协作、客户现场或节奏适应相关线索，具备进一步验证价值"
-    return [
-        f"系统学习与知识结构：围绕 {company_type} 与 {role_name} 所需能力，已体现对 {skill_words} 等知识模块的接触和应用基础。",
-        f"技能掌握与实践经验：过往经历可迁移到 {company_name} 的 {role_name}，重点优势在任务拆解、结果交付、跨团队协同和岗位关键词相关实践。",
-        f"岗位胜任度：与 JD 匹配的经历应优先呈现为“目标 - 动作 - 结果 - 复盘”，适合投递 {role_name} 及相近的业务/产品/项目/运营协同类岗位。",
-        f"性格与沟通协作：从材料看具备主动推进、沟通表达、组织协调和问题闭环意识；建议在面试中准备 1-2 个冲突协调或复杂协作案例。",
-        f"抗压与适应度：{quant}；{mobility}，避免在简历中作无法核验的绝对化承诺。",
-    ]
+        mobility = "能够适应加班、出差及高强度协作节奏"
+    return (
+        f"候选人围绕{company_type}及{role_name}所需能力，系统学习过{skill_words}等相关知识，"
+        f"掌握资料整理、数据分析、项目推进、沟通协调等技能，具备与{company_name}{role_name}匹配的执行经验。"
+        f"其性格稳重细致，对相关业务有兴趣，表达清晰，组织协调和问题闭环意识较强；"
+        f"同时{quant}，抗压性较好，吃苦耐劳，{mobility}。"
+    )
 
 
 def adapt_bullets(lines, keywords, company_type, tone):
@@ -176,10 +175,9 @@ def insert_frontmatter(doc, evaluation, bullets, role, company):
     title = insert_before(first)
     title.alignment = WD_ALIGN_PARAGRAPH.LEFT
     add_run(title, "综合评价", bold=True, size=13, color=(23, 78, 166))
-    for item in evaluation:
-        p = insert_before(first)
-        p.style = doc.styles["Normal"]
-        add_run(p, item, size=9.5)
+    p = insert_before(first)
+    p.style = doc.styles["Normal"]
+    add_run(p, evaluation, size=9.5)
     p = insert_before(first)
     add_run(p, "", size=4)
     focus = insert_before(first)
@@ -205,10 +203,9 @@ def create_new_docx(out_path, source_text, evaluation, bullets, role, company):
     doc.add_paragraph()
     h = doc.add_paragraph()
     add_run(h, "综合评价", bold=True, size=12, color=(23, 78, 166))
-    for item in evaluation:
-        p = doc.add_paragraph(style=None)
-        p.paragraph_format.left_indent = Pt(12)
-        add_run(p, item, size=10)
+    p = doc.add_paragraph(style=None)
+    p.paragraph_format.left_indent = Pt(12)
+    add_run(p, evaluation, size=10)
     h = doc.add_paragraph()
     add_run(h, "岗位适配重点", bold=True, size=12, color=(23, 78, 166))
     for item in bullets:
@@ -246,7 +243,7 @@ def generate_docx(upload_path, filename, payload):
         doc.save(out_path)
     else:
         create_new_docx(out_path, source_text, evaluation, bullets, payload["role"], payload["company"])
-    preview = "\n".join(["综合评价", *[f"- {item}" for item in evaluation], "", "岗位适配重点", *[f"- {item}" for item in bullets]])
+    preview = "\n".join(["综合评价", evaluation, "", "岗位适配重点", *[f"- {item}" for item in bullets]])
     return out_path, preview, keywords
 
 
