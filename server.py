@@ -108,9 +108,20 @@ def select_lines(resume_text, jd, requirements, intensity):
     keywords = tokenize(jd + "\n" + requirements)
     lines = [line.strip(" -*\u2022") for line in normalize(resume_text).splitlines() if len(line.strip()) > 6]
     scored = sorted(((line, score_line(line, keywords)) for line in lines), key=lambda item: item[1], reverse=True)
-    count = {"conservative": 7, "balanced": 9, "aggressive": 12}.get(intensity, 9)
+    count = {
+        "low": 7,
+        "medium": 9,
+        "high": 12,
+        "conservative": 7,
+        "balanced": 9,
+        "aggressive": 12,
+    }.get(intensity, 9)
     picked = [line for line, score in scored if score > 0][:count] or lines[: min(count, len(lines))]
     return keywords, picked
+
+
+def clean_company_type(company_type):
+    return re.split(r"[（(]", company_type or "目标公司类型", maxsplit=1)[0].strip()
 
 
 def build_evaluation(resume_text, jd, requirements, role, company, company_type, keywords):
@@ -119,27 +130,27 @@ def build_evaluation(resume_text, jd, requirements, role, company, company_type,
     skill_words = "、".join((matched or keywords)[:5]) or "岗位相关技能"
     role_name = role or "目标岗位"
     company_name = company or "目标公司"
+    company_type_name = clean_company_type(company_type)
     has_numbers = bool(re.search(r"[0-9%万亿kK+]", resume_text))
     quant = "具备一定量化成果意识" if has_numbers else "可继续补充量化成果"
     mobility = "可适应加班、出差及快节奏工作"
     if re.search(r"出差|加班|抗压|高压|吃苦|驻场|客户现场", all_text):
         mobility = "能够适应加班、出差及高强度协作节奏"
     return (
-        f"候选人围绕{company_type}及{role_name}所需能力，系统学习过{skill_words}等相关知识，"
+        f"候选人围绕{company_type_name}及{role_name}所需能力，系统学习过{skill_words}等相关知识，"
         f"掌握资料整理、数据分析、项目推进、沟通协调等技能，具备与{company_name}{role_name}匹配的执行经验。"
         f"其性格稳重细致，对相关业务有兴趣，表达清晰，组织协调和问题闭环意识较强；"
         f"同时{quant}，抗压性较好，吃苦耐劳，{mobility}。"
     )
 
 
-def adapt_bullets(lines, keywords, company_type, tone):
-    tone_prefix = {
-        "direct": "主导",
-        "executive": "统筹",
-        "builder": "落地",
-    }.get(tone, "主导")
-    if "早期创业" in company_type:
+def adapt_bullets(lines, keywords, company_type):
+    tone_prefix = "主导"
+    company_type_name = clean_company_type(company_type)
+    if "早期创业" in company_type_name:
         tone_prefix = "从0到1推进"
+    elif any(label in company_type_name for label in ("国企央企", "银行")):
+        tone_prefix = "稳健推进"
     bullets = []
     for line in lines:
         clean = re.sub(r"^[-*\u2022]\s*", "", line).rstrip("。；;")
@@ -232,7 +243,7 @@ def generate_docx(upload_path, filename, payload):
         payload["companyType"],
         keywords,
     )
-    bullets = adapt_bullets(lines, keywords, payload["companyType"], payload["tone"])
+    bullets = adapt_bullets(lines, keywords, payload["companyType"])
     safe_company = re.sub(r"[\\/:*?\"<>|]+", "-", payload["company"] or "target-company")
     safe_role = re.sub(r"[\\/:*?\"<>|]+", "-", payload["role"] or "target-role")
     out_path = Path(tempfile.gettempdir()) / f"{safe_company}-{safe_role}-resume.docx"
@@ -323,7 +334,6 @@ class Handler(BaseHTTPRequestHandler):
                 "role": form.getfirst("role", ""),
                 "companyType": form.getfirst("companyType", "AI 原生公司"),
                 "intensity": form.getfirst("intensity", "balanced"),
-                "tone": form.getfirst("tone", "direct"),
                 "jd": form.getfirst("jd", ""),
                 "requirements": form.getfirst("requirements", ""),
             }
