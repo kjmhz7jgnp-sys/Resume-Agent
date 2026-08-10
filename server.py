@@ -104,30 +104,120 @@ def score_line(line, keywords):
     return score
 
 
-def select_lines(resume_text, jd, requirements, intensity):
-    keywords = tokenize(jd + "\n" + requirements)
-    lines = [line.strip(" -*\u2022") for line in normalize(resume_text).splitlines() if len(line.strip()) > 6]
-    scored = sorted(((line, score_line(line, keywords)) for line in lines), key=lambda item: item[1], reverse=True)
-    count = {
-        "low": 7,
-        "medium": 9,
-        "high": 12,
-        "conservative": 7,
-        "balanced": 9,
-        "aggressive": 12,
-    }.get(intensity, 9)
-    picked = [line for line, score in scored if score > 0][:count] or lines[: min(count, len(lines))]
-    return keywords, picked
+def intensity_count(intensity):
+    return {
+        "low": 3,
+        "medium": 4,
+        "high": 5,
+        "conservative": 3,
+        "balanced": 4,
+        "aggressive": 5,
+    }.get(intensity, 4)
 
 
 def clean_company_type(company_type):
     return re.split(r"[（(]", company_type or "目标公司类型", maxsplit=1)[0].strip()
 
 
+def split_resume_sections(resume_text):
+    section_aliases = {
+        "internship": re.compile(r"(实习经历|工作经历|工作/实习经历|实习实践|实践经历|职业经历|校外实践)"),
+        "project": re.compile(r"(项目经历|项目经验|研究项目|课程项目|校园项目|调研项目|竞赛项目)"),
+    }
+    current = None
+    sections = {"internship": [], "project": []}
+    for raw in normalize(resume_text).splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        compact = re.sub(r"\s+", "", line)
+        matched_heading = False
+        for name, pattern in section_aliases.items():
+            if len(compact) <= 12 and pattern.search(compact):
+                current = name
+                matched_heading = True
+                break
+        if matched_heading:
+            continue
+        if current:
+            sections[current].append(line.strip(" -*\u2022"))
+
+    all_lines = [line.strip(" -*\u2022") for line in normalize(resume_text).splitlines() if len(line.strip()) > 8]
+    if not sections["internship"]:
+        sections["internship"] = [
+            line for line in all_lines
+            if re.search(r"实习|公司|财务|运营|商务|助理|银行|客户|审核|发票|单据|合同|报销|数据|对账|部门", line)
+        ][:8]
+    if not sections["project"]:
+        sections["project"] = [
+            line for line in all_lines
+            if re.search(r"项目|调研|研究|竞品|分析|报告|校园|课程|活动|社团|访谈|用户|市场|战略", line)
+        ][:8]
+    return sections
+
+
+def infer_capabilities(text):
+    capability_rules = [
+        ("细节意识与流程规范", r"发票|报关|单据|合同|审核|审批|报销|对账|资料|凭证|合规|风控"),
+        ("数据整理与分析", r"Excel|SQL|Python|Stata|数据|报表|统计|指标|分析|VLOOKUP|透视表"),
+        ("市场与竞品研究", r"市场|竞品|行业|用户|调研|访谈|问卷|战略|竞对|产品分析|行研"),
+        ("项目推进与节点把控", r"项目|推进|节点|排期|执行|落地|统筹|进度|交付|复盘"),
+        ("沟通表达与组织协调", r"沟通|协调|跨部门|跨团队|会议|对接|合作方|客户|供应商|政府|企业|团队"),
+        ("文档撰写与资料沉淀", r"文档|材料|方案|提案|报告|纪要|PPT|Word|邮件|会议资料"),
+        ("跨文化与英文沟通", r"英语|英文|IELTS|CET|海外|国际|跨文化|留学|全球|外贸"),
+        ("游戏理解与玩家同理心", r"游戏|ACG|玩家|版本|玩法|社区|发行|商务|CP|用户体验|内容生态"),
+    ]
+    found = []
+    for label, pattern in capability_rules:
+        if re.search(pattern, text, re.I):
+            found.append(label)
+    return found
+
+
+def cap_text(text, limit=76):
+    text = re.sub(r"\s+", " ", text).strip(" ，。；;-")
+    return text if len(text) <= limit else text[:limit - 1].rstrip("，；、 ") + "。"
+
+
+def rewrite_experience_line(line, jd, requirements, keywords, section_kind):
+    original = re.sub(r"^[-*\u2022]\s*", "", line).rstrip("。；;")
+    all_text = "\n".join([original, jd, requirements])
+    caps = infer_capabilities(all_text)
+    if not caps:
+        caps = (keywords or ["岗位匹配能力"])[:2]
+    caps = caps[:2]
+    if re.search(r"发票|报关|单据|合同|审核|审批|报销|对账|凭证", original):
+        bridge = "细致度、流程规范意识和执行力"
+    elif re.search(r"竞品|市场|调研|行业|战略|访谈|报告|用户", original):
+        bridge = "信息搜集、竞品分析和结构化判断能力"
+    elif re.search(r"Excel|SQL|Python|Stata|数据|报表|统计|指标", original, re.I):
+        bridge = "数据敏感度、工具使用和问题拆解能力"
+    elif re.search(r"沟通|协调|会议|对接|合作|团队|活动|社团|组织", original):
+        bridge = "沟通协调、节点把控和落地推进能力"
+    else:
+        bridge = f"{'、'.join(caps)}等岗位相关能力"
+    rewritten = f"{original}，体现{bridge}。"
+    return cap_text(rewritten, 88)
+
+
+def adapt_experience_sections(resume_text, jd, requirements, keywords, intensity):
+    sections = split_resume_sections(resume_text)
+    count = intensity_count(intensity)
+    adapted = {}
+    for kind in ("internship", "project"):
+        lines = [line for line in sections[kind] if len(line.strip()) > 6]
+        scored = sorted(((line, score_line(line, keywords)) for line in lines), key=lambda item: item[1], reverse=True)
+        picked = [line for line, _ in scored[:count]] or lines[:count]
+        adapted[kind] = [rewrite_experience_line(line, jd, requirements, keywords, kind) for line in picked]
+    return adapted
+
+
 def build_evaluation(resume_text, jd, requirements, role, company, company_type, keywords):
     all_text = resume_text + "\n" + jd + "\n" + requirements
     matched = [kw for kw in keywords if kw.lower() in resume_text.lower()]
-    skill_words = "、".join((matched or keywords)[:5]) or "岗位相关技能"
+    capabilities = infer_capabilities(all_text)
+    skill_words = "、".join((matched or keywords)[:4]) or "岗位相关技能"
+    capability_words = "、".join(capabilities[:4]) or "资料整理、沟通协调、项目执行"
     role_name = role or "目标岗位"
     company_name = company or "目标公司"
     company_type_name = clean_company_type(company_type)
@@ -136,31 +226,18 @@ def build_evaluation(resume_text, jd, requirements, role, company, company_type,
     mobility = "可适应加班、出差及快节奏工作"
     if re.search(r"出差|加班|抗压|高压|吃苦|驻场|客户现场", all_text):
         mobility = "能够适应加班、出差及高强度协作节奏"
+    if "游戏" in all_text or "游戏" in company_type_name:
+        return (
+            f"候选人长期关注游戏及ACG内容生态，具备玩家同理心和产品观察意识，系统学习过{skill_words}等相关知识，"
+            f"能够从用户体验、市场反馈和项目执行角度理解{company_name}{role_name}工作。过往经历体现出{capability_words}等能力，"
+            f"性格细致负责，表达清晰，组织协调和学习能力较强；抗压性较好，吃苦耐劳，{mobility}。"
+        )
     return (
         f"候选人围绕{company_type_name}及{role_name}所需能力，系统学习过{skill_words}等相关知识，"
-        f"掌握资料整理、数据分析、项目推进、沟通协调等技能，具备与{company_name}{role_name}匹配的执行经验。"
+        f"掌握{capability_words}等技能，具备与{company_name}{role_name}匹配的执行经验。"
         f"其性格稳重细致，对相关业务有兴趣，表达清晰，组织协调和问题闭环意识较强；"
         f"同时{quant}，抗压性较好，吃苦耐劳，{mobility}。"
     )
-
-
-def adapt_bullets(lines, keywords, company_type):
-    tone_prefix = "主导"
-    company_type_name = clean_company_type(company_type)
-    if "早期创业" in company_type_name:
-        tone_prefix = "从0到1推进"
-    elif any(label in company_type_name for label in ("国企央企", "银行")):
-        tone_prefix = "稳健推进"
-    bullets = []
-    for line in lines:
-        clean = re.sub(r"^[-*\u2022]\s*", "", line).rstrip("。；;")
-        matched = [kw for kw in keywords if kw.lower() in clean.lower()][:3]
-        suffix = f"，对应岗位关注的{'、'.join(matched)}" if matched else "，强化目标岗位所需的业务判断与执行闭环"
-        if re.match(r"^(主导|负责|推动|搭建|设计|优化|统筹|落地|从0到1|管理)", clean):
-            bullets.append(f"{clean}{suffix}")
-        else:
-            bullets.append(f"{tone_prefix}{clean}{suffix}")
-    return bullets
 
 
 def add_run(paragraph, text, bold=False, size=10.5, color=None):
@@ -181,27 +258,7 @@ def insert_before(paragraph, text="", style=None):
     return new_p
 
 
-def insert_frontmatter(doc, evaluation, bullets, role, company):
-    first = doc.paragraphs[0] if doc.paragraphs else doc.add_paragraph()
-    title = insert_before(first)
-    title.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    add_run(title, "综合评价", bold=True, size=13, color=(23, 78, 166))
-    p = insert_before(first)
-    p.style = doc.styles["Normal"]
-    add_run(p, evaluation, size=9.5)
-    p = insert_before(first)
-    add_run(p, "", size=4)
-    focus = insert_before(first)
-    add_run(focus, f"岗位适配重点：{company or '目标公司'}｜{role or '目标岗位'}", bold=True, size=11, color=(23, 78, 166))
-    for item in bullets:
-        p = insert_before(first)
-        p.style = doc.styles["Normal"]
-        add_run(p, item, size=9.5)
-    spacer = insert_before(first)
-    add_run(spacer, "", size=4)
-
-
-def create_new_docx(out_path, source_text, evaluation, bullets, role, company):
+def create_new_docx(out_path, evaluation, adapted_sections, role, company):
     doc = Document()
     section = doc.sections[0]
     section.top_margin = Pt(42)
@@ -217,23 +274,20 @@ def create_new_docx(out_path, source_text, evaluation, bullets, role, company):
     p = doc.add_paragraph(style=None)
     p.paragraph_format.left_indent = Pt(12)
     add_run(p, evaluation, size=10)
-    h = doc.add_paragraph()
-    add_run(h, "岗位适配重点", bold=True, size=12, color=(23, 78, 166))
-    for item in bullets:
-        p = doc.add_paragraph()
-        p.paragraph_format.left_indent = Pt(12)
-        add_run(p, item, size=10)
-    h = doc.add_paragraph()
-    add_run(h, "原简历文本（便于核对）", bold=True, size=12, color=(23, 78, 166))
-    for line in [line for line in source_text.splitlines() if line.strip()][:80]:
-        p = doc.add_paragraph()
-        add_run(p, line.strip(), size=9.5)
+    for heading, key in (("实习经历", "internship"), ("项目经历", "project")):
+        h = doc.add_paragraph()
+        add_run(h, heading, bold=True, size=12, color=(23, 78, 166))
+        items = adapted_sections.get(key) or ["原简历中未识别到明确内容，建议补充对应经历后重新生成。"]
+        for item in items:
+            p = doc.add_paragraph()
+            p.paragraph_format.left_indent = Pt(12)
+            add_run(p, item, size=9.5)
     doc.save(out_path)
 
 
 def generate_docx(upload_path, filename, payload):
     source_text = extract_text(upload_path, filename)
-    keywords, lines = select_lines(source_text, payload["jd"], payload["requirements"], payload["intensity"])
+    keywords = tokenize(payload["jd"] + "\n" + payload["requirements"])
     evaluation = build_evaluation(
         source_text,
         payload["jd"],
@@ -243,18 +297,27 @@ def generate_docx(upload_path, filename, payload):
         payload["companyType"],
         keywords,
     )
-    bullets = adapt_bullets(lines, keywords, payload["companyType"])
+    adapted_sections = adapt_experience_sections(
+        source_text,
+        payload["jd"],
+        payload["requirements"],
+        keywords,
+        payload["intensity"],
+    )
     safe_company = re.sub(r"[\\/:*?\"<>|]+", "-", payload["company"] or "target-company")
     safe_role = re.sub(r"[\\/:*?\"<>|]+", "-", payload["role"] or "target-role")
     out_path = Path(tempfile.gettempdir()) / f"{safe_company}-{safe_role}-resume.docx"
-    if filename.lower().endswith(".docx"):
-        shutil.copyfile(upload_path, out_path)
-        doc = Document(out_path)
-        insert_frontmatter(doc, evaluation, bullets, payload["role"], payload["company"])
-        doc.save(out_path)
-    else:
-        create_new_docx(out_path, source_text, evaluation, bullets, payload["role"], payload["company"])
-    preview = "\n".join(["综合评价", evaluation, "", "岗位适配重点", *[f"- {item}" for item in bullets]])
+    create_new_docx(out_path, evaluation, adapted_sections, payload["role"], payload["company"])
+    preview = "\n".join([
+        "综合评价",
+        evaluation,
+        "",
+        "实习经历",
+        *[f"- {item}" for item in adapted_sections.get("internship", [])],
+        "",
+        "项目经历",
+        *[f"- {item}" for item in adapted_sections.get("project", [])],
+    ])
     return out_path, preview, keywords
 
 
